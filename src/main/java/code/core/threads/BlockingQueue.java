@@ -16,14 +16,14 @@ public class BlockingQueue<T> {
             wait();
         }
         queue.add(item);
-        notify();
+        notifyAll();
     }
 
     public synchronized T dequeue() throws InterruptedException {
         while (queue.isEmpty()) {
             wait();
         }
-        notify();
+        notifyAll();
         return queue.removeFirst();
     }
 
