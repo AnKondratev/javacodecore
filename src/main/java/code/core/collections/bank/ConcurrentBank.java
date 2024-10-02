@@ -5,11 +5,14 @@ import lombok.Data;
 
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Data
 public class ConcurrentBank {
 
-    private HashMap<String, BankAccount> accounts = new HashMap<>();
+    private final HashMap<String, BankAccount> accounts = new HashMap<>();
+    private final Lock lock = new ReentrantLock();
 
     public BankAccount createAccount(int balance) {
         UUID uuid = UUID.randomUUID();
@@ -18,7 +21,7 @@ public class ConcurrentBank {
         return account;
     }
 
-    public synchronized void transfer(BankAccount account1, BankAccount account2, int amount) {
+    public void transfer(BankAccount account1, BankAccount account2, int amount) {
         if (account1 == null || account2 == null) {
             throw new NullPointerException("account1 or account2 are null");
         }
@@ -28,8 +31,21 @@ public class ConcurrentBank {
         if (amount > account1.getBalance()) {
             throw new IllegalArgumentException("amount is greater than balance");
         }
-        account1.setBalance(account1.getBalance() - amount);
-        account2.setBalance(account2.getBalance() + amount);
+
+        BankAccount firstLock = account1.getLock().hashCode() < account2.getLock().hashCode() ? account1 : account2;
+        BankAccount secondLock = firstLock == account1 ? account2 : account1;
+        firstLock.getLock().lock();
+        try {
+            secondLock.getLock().lock();
+            try {
+                account1.setBalance(account1.getBalance() - amount);
+                account2.setBalance(account2.getBalance() + amount);
+            } finally {
+                secondLock.getLock().unlock();
+            }
+        } finally {
+            firstLock.getLock().unlock();
+        }
     }
 
     public int totalBalance() {
